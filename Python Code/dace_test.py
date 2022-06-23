@@ -7,7 +7,7 @@ from dace.transformation.dataflow import MapExpansion
 
 
 N = dace.symbol('N')
-sz = 10000
+sz = 100000000
 
 
 @dace.program
@@ -43,7 +43,7 @@ def KernelCall(state):
         out[0] = double(0);
     }}
     double sum = double(0);
-    for (int id = i + j; id < N; id += blockDim.x * gridDim.x) {{
+    for (int id = i * 256 + j; id < N; id += blockDim.x * gridDim.x) {{
         sum += in1[id] * in2[id];
     }}
     for (int offset = warpSize/2; offset > 0; offset /= 2) {{
@@ -56,7 +56,7 @@ def KernelCall(state):
 
     tasklet, me, mx = state.add_mapped_tasklet(
         name='callingKernel',
-        map_ranges={'i': '0:N:256', 'j': '0:256'},
+        map_ranges={'i': '0:min(int_ceil(N, 256), 2048)', 'j': '0:256'},
         inputs={'in1': dace.Memlet('A[0:N]'), 'in2': dace.Memlet('B[0:N]')},
         outputs={'out': dace.Memlet('__return[0]')},
         code=tasklet_code,
@@ -79,3 +79,5 @@ for n in callState.nodes():
         
 res2 = sdfg2(A=gA, B=gB, N=sz)
 print(res2)
+
+assert(np.allclose(res, res2))
